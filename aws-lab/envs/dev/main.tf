@@ -2,6 +2,7 @@ provider "aws" {
   region = var.aws_region
 }
 
+
 # Pobranie domyślnego VPC
 data "aws_vpc" "default" {
   default = true
@@ -81,4 +82,16 @@ module "managed_node_2" {
     Environment = "dev"
     Role        = "ansible-node"
   }
+}
+
+output "control_node_public_ip" {
+  value = module.control_node.public_ip
+}
+
+output "managed_node_1_public_ip" {
+  value = module.managed_node_1.public_ip
+}
+
+output "managed_node_2_public_ip" {
+  value = module.managed_node_2.public_ip
 }
