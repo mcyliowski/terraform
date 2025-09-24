@@ -1,0 +1,15 @@
+---
+- name: Reset kubeadm
+  command: kubeadm reset -f
+  ignore_errors: true
+
+- name: Remove old data
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/cni/net.d
+    - /var/lib/etcd
+    - /etc/kubernetes/manifests
+    - /var/lib/kubelet
+    - /etc/kubernetes/admin.conf

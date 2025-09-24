@@ -1,0 +1,17 @@
+- name: Prepare all nodes
+  hosts: all
+  become: true
+  roles:
+    - prepare-nodes
+
+- name: Initialize control plane
+  hosts: control
+  become: true
+  roles:
+    - init-control
+  
+- name: Join worker nodes to the cluster
+  hosts: managed
+  become: true
+  roles:
+    - join-workers

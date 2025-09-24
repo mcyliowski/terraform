@@ -1,0 +1,105 @@
+---
+- name: Prepare control node (containerd + sysctl + hosts) #trzeba polaczyc z k8-cluster.yaml
+  hosts: control
+  become: yes
+  tasks:
+
+    - name: Ensure apt cache is up to date
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages for containerd and repo access
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Install containerd
+      apt:
+        name: containerd
+        state: present
+        update_cache: yes
+
+    - name: Ensure /etc/containerd exists
+      file:
+        path: /etc/containerd
+        state: directory
+        mode: '0755'
+
+    - name: Generate default containerd config if not present
+      command: containerd config default
+      register: containerd_default_cfg
+      changed_when: false
+      check_mode: no
+      failed_when: containerd_default_cfg.rc != 0 and containerd_default_cfg.rc != 0
+
+    - name: Write default containerd config to /etc/containerd/config.toml (idempotent)
+      copy:
+        content: "{{ containerd_default_cfg.stdout | default('') }}"
+        dest: /etc/containerd/config.toml
+      when: containerd_default_cfg.stdout is defined and containerd_default_cfg.stdout != ''
+
+    - name: Ensure containerd service is enabled and started
+      systemd:
+        name: containerd
+        enabled: yes
+        state: restarted
+
+    - name: Make sure br_netfilter module is loaded
+      modprobe:
+        name: br_netfilter
+        state: present
+
+    - name: Ensure br_netfilter is loaded on boot
+      lineinfile:
+        path: /etc/modules-load.d/k8s.conf
+        line: br_netfilter
+        create: yes
+        mode: '0644'
+
+    - name: Set required sysctl params for Kubernetes
+      sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      loop:
+        - { name: "net.bridge.bridge-nf-call-iptables", value: 1 }
+        - { name: "net.bridge.bridge-nf-call-ip6tables", value: 1 }
+        - { name: "net.ipv4.ip_forward", value: 1 }
+
+    - name: Persist sysctl changes
+      copy:
+        dest: /etc/sysctl.d/99-k8s.conf
+        content: |
+          net.bridge.bridge-nf-call-iptables = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward = 1
+        mode: '0644'
+
+    - name: Reload sysctl
+      command: sysctl --system
+      changed_when: false
+
+    - name: Add control-node private IP -> hostname to /etc/hosts (avoid hostname lookup warning)
+      lineinfile:
+        path: /etc/hosts
+        regexp: '(^{{ ansible_default_ipv4.address }}\s+{{ inventory_hostname }}$)|(^.*\s+{{ inventory_hostname }}$)'
+        line: "{{ ansible_default_ipv4.address }} {{ inventory_hostname }}"
+        state: present
+      become: yes
+
+    - name: Ensure swap is off (temporary)
+      command: swapoff -a
+      ignore_errors: yes
+
+    - name: Remove swap entry from /etc/fstab
+      replace:
+        path: /etc/fstab
+        regexp: '(^.*swap.*$)'
+        replace: '# \1'
+      ignore_errors: yes
