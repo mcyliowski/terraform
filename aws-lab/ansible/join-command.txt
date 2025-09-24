@@ -1,0 +1,1 @@
+kubeadm join 172.31.65.146:6443 --token 3xmhno.brx57mol262hqvc5 --discovery-token-ca-cert-hash sha256:9004e1cba3fcb4bc95e26898576b96c7a6fc3ee8e1e002aaf5f34d9525dfca15 

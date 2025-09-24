@@ -1,0 +1,54 @@
+---
+- name: Reset cluster (if any exists)
+  command: kubeadm reset -f
+  ignore_errors: true
+
+- name: Remove old data
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/cni/net.d
+    - /var/lib/etcd
+    - /etc/kubernetes/manifests
+
+- name: Initialize the control plane
+  command: kubeadm init --pod-network-cidr=10.244.0.0/16
+  register: kubeadm_init
+  failed_when: kubeadm_init.rc != 0
+
+- name: Create .kube directory for admin
+  file:
+    path: /home/admin/.kube
+    state: directory
+    owner: admin
+    group: admin
+    mode: '0755'
+
+- name: Copy admin kubeconfig
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/admin/.kube/config
+    owner: admin
+    group: admin
+    mode: '0644'
+    remote_src: yes
+
+- name: Extract join command
+  shell: kubeadm token create --print-join-command
+  register: join_command
+
+- name: Save join command locally
+  copy:
+    content: "{{ join_command.stdout }}"
+    dest: ./join-command.txt
+    mode: '0644'
+  delegate_to: localhost
+  become: no
+
+- name: Install Flannel CNI
+  become: true
+  command: kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+

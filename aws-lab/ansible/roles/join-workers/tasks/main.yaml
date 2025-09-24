@@ -1,0 +1,9 @@
+---
+- name: Copy join command to worker
+  copy:
+    src: ./join-command.txt
+    dest: /tmp/join-command.sh
+    mode: '0755'
+
+- name: Execute join command
+  command: /bin/sh /tmp/join-command.sh
