@@ -11,7 +11,7 @@
     - init-control
   
 - name: Join worker nodes to the cluster
-  hosts: managed
+  hosts: workers
   become: true
   roles:
     - join-workers
