@@ -1,21 +1,37 @@
 ---
-- name: Reset cluster (if any exists)
-  command: kubeadm reset -f
-  ignore_errors: true
+- name: Initialize Kubernetes control plane
+  hosts: control
+  become: true
+  tasks:
 
-- name: Remove old data
+- name: Ensure /opt/cni/bin exists
   file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /etc/cni/net.d
-    - /var/lib/etcd
-    - /etc/kubernetes/manifests
+    path: /opt/cni/bin
+    state: directory
+    mode: '0755'
 
-- name: Initialize the control plane
-  command: kubeadm init --pod-network-cidr=10.244.0.0/16
+- name: Download CNI plugins
+  get_url:
+    url: https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz
+    dest: /tmp/cni-plugins.tgz
+
+- name: Extract CNI plugins
+  unarchive:
+    src: /tmp/cni-plugins.tgz
+    dest: /opt/cni/bin
+    remote_src: yes
+
+- name: Ensure CNI symlink for kubelet
+  file:
+    src: /opt/cni/bin
+    dest: /usr/lib/cni
+    state: link
+
+- name: Initialize Kubernetes control plane
+  command: kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint=control-node
   register: kubeadm_init
-  failed_when: kubeadm_init.rc != 0
+  args:
+    creates: /etc/kubernetes/admin.conf
 
 - name: Create .kube directory for admin
   file:
@@ -25,30 +41,49 @@
     group: admin
     mode: '0755'
 
-- name: Copy admin kubeconfig
+- name: Copy admin.conf to user's kube config
   copy:
     src: /etc/kubernetes/admin.conf
     dest: /home/admin/.kube/config
+    remote_src: yes
     owner: admin
     group: admin
     mode: '0644'
-    remote_src: yes
 
-- name: Extract join command
+- name: Wait for Kubernetes API to be ready
+  become_user: admin
+  command: kubectl get nodes
+  register: kube_api
+  retries: 15
+  delay: 10
+  until: kube_api.rc == 0
+
+- name: Install Calico CNI
+  become_user: admin
+  command: kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
+
+- name: Wait for all control plane pods to be Running
+  become_user: admin
+  shell: |
+    kubectl get pods -n kube-system --no-headers | awk '{print $3}' | grep -v Running
+  register: pods_not_running
+  retries: 20
+  delay: 15
+  until: pods_not_running.stdout == ""
+
+- name: Save kubeadm join command for workers
   shell: kubeadm token create --print-join-command
-  register: join_command
+  register: join_command_result
 
-- name: Save join command locally
-  copy:
-    content: "{{ join_command.stdout }}"
-    dest: ./join-command.txt
-    mode: '0644'
-  delegate_to: localhost
-  become: no
+- name: Set join_command fact
+  set_fact:
+    join_command: "{{ join_command_result.stdout }}"
 
-- name: Install Flannel CNI
-  become: true
-  command: kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-
+- name: Wait for all nodes (control + workers) to become Ready
+  become_user: admin
+  shell: |
+    kubectl get nodes --no-headers | awk '{print $2}' | grep -v Ready
+  register: not_ready
+  retries: 20
+  delay: 15
+  until: not_ready.stdout == ""

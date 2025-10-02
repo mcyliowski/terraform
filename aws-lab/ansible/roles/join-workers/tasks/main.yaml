@@ -1,9 +1,5 @@
 ---
-- name: Copy join command to worker
-  copy:
-    src: ./join-command.txt
-    dest: /tmp/join-command.sh
-    mode: '0755'
+- name: Join worker node to the cluster
+  command: "{{ hostvars['control-node'].join_command }}"
+  when: hostvars['control-node'].join_command is defined
 
-- name: Execute join command
-  command: /bin/sh /tmp/join-command.sh
