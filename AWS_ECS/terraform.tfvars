@@ -6,8 +6,8 @@ domain_name   = "test.wbd.actor"
 app_subdomain = "app"
 
 # Docker images
-frontend_image = "cyna58/nauka_v1:frontend_v3.1"
-backend_image  = "cyna58/nauka_v1:backend_v4.3"
+frontend_image = "cyna58/nauka_v1:poe_v1.1"
+backend_image  = "cyna58/nauka_v1:backend_v2.1"
 mongodb_image  = "cyna58/nauka_v1:mongo_v2"
 
 # ECS task config
