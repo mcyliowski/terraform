@@ -6,9 +6,9 @@ domain_name   = "test.wbd.actor"
 app_subdomain = "jakibuildwariacie"
 
 # Docker images
-frontend_image = "cyna58/nauka-kubernetes:frontend-poe_v1"
+frontend_image = "cyna58/nauka-kubernetes:frontend_reset_v2"
 backend_image  = "cyna58/nauka-kubernetes:backend-poe_v1"
-mongodb_image  = "cyna58/nauka_v1:mongo_v2"
+mongodb_image  = "cyna58/nauka_kubernetes:mongodb-k8s"
 
 # ECS task config
 desired_count      = 1
