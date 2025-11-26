@@ -1,5 +1,0 @@
----
-- name: Join worker node to the cluster
-  command: "{{ hostvars['control-node'].join_command }}"
-  when: hostvars['control-node'].join_command is defined
-
