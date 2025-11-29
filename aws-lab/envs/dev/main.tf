@@ -126,15 +126,15 @@ module "managed_node_2" {
   }
 }
 
-# Outputs prywatnych IP do Ansible
-output "control_node_private_ip" {
+# Outputs publicznych IP do Ansible
+output "control_node_public_ip" {
   value = module.control_node.public_ip
 }
 
-output "managed_node_1_private_ip" {
+output "managed_node_1_public_ip" {
   value = module.managed_node_1.public_ip
 }
 
-output "managed_node_2_private_ip" {
+output "managed_node_2_public_ip" {
   value = module.managed_node_2.public_ip
 }
